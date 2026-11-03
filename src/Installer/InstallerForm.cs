@@ -35,6 +35,11 @@ namespace OpenClevoRGBInstaller
         private Button btnCancel;
         private Button btnInstall;
 
+        // Controle de Modo de Atualização (In-Place Update)
+        private bool isUpdateMode = false;
+        private string detectedExistingVersion = string.Empty;
+        private string detectedExistingPath = string.Empty;
+
         // Cores Dark Theme Moderno
         private readonly Color ClrBgWindow     = Color.FromArgb(12, 13, 17);
         private readonly Color ClrCardBg       = Color.FromArgb(19, 22, 30);
@@ -46,7 +51,92 @@ namespace OpenClevoRGBInstaller
 
         public InstallerForm()
         {
+            DetectExistingInstallation();
             InitializeComponent();
+            ApplyModeVisuals();
+        }
+
+        private void DetectExistingInstallation()
+        {
+            try
+            {
+                // 1. Tenta verificar chave de registro oficial do OpenClevoRGB
+                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB", false))
+                {
+                    if (key != null)
+                    {
+                        object loc = key.GetValue("InstallLocation");
+                        object ver = key.GetValue("DisplayVersion");
+                        if (loc != null && !string.IsNullOrEmpty(loc.ToString()))
+                        {
+                            detectedExistingPath = loc.ToString();
+                            detectedExistingVersion = ver != null ? ver.ToString() : "1.x";
+                            isUpdateMode = true;
+                            return;
+                        }
+                    }
+                }
+
+                // 2. Tenta verificar se a pasta padrão em Arquivos de Programas já tem o executável
+                string defaultPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "OpenClevoRGB"
+                );
+                string exePath = Path.Combine(defaultPath, "OpenClevoRGB.exe");
+                if (File.Exists(exePath))
+                {
+                    detectedExistingPath = defaultPath;
+                    try
+                    {
+                        FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(exePath);
+                        detectedExistingVersion = fvi.ProductVersion;
+                    }
+                    catch
+                    {
+                        detectedExistingVersion = "1.x";
+                    }
+                    isUpdateMode = true;
+                    return;
+                }
+
+                // 3. Fallback: Verifica versão legada AvellRGBKeyboardMaster
+                using (RegistryKey oldKey = Registry.LocalMachine.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\AvellRGBKeyboardMaster", false))
+                {
+                    if (oldKey != null)
+                    {
+                        object loc = oldKey.GetValue("InstallLocation");
+                        object ver = oldKey.GetValue("DisplayVersion");
+                        if (loc != null && !string.IsNullOrEmpty(loc.ToString()))
+                        {
+                            detectedExistingPath = defaultPath;
+                            detectedExistingVersion = ver != null ? ver.ToString() : "1.2.0";
+                            isUpdateMode = true;
+                        }
+                    }
+                }
+            }
+            catch {}
+        }
+
+        private void ApplyModeVisuals()
+        {
+            if (isUpdateMode)
+            {
+                this.Text = "Atualizador - OpenClevoRGB";
+                lblTitle.Text = "ATUALIZAR • OPENCLEVO RGB";
+                lblTitle.ForeColor = ClrAccentGreen;
+                lblSubtitle.Text = string.Format("Instalação detectada (v{0} ➔ v1.4.0). Suas preferências e cores serão mantidas!", detectedExistingVersion);
+                lblSubtitle.ForeColor = ClrAccentGreen;
+
+                if (!string.IsNullOrEmpty(detectedExistingPath))
+                {
+                    txtInstallPath.Text = detectedExistingPath;
+                }
+
+                btnInstall.Text = "🔄 Atualizar Agora";
+                btnInstall.BackColor = Color.FromArgb(0, 180, 90);
+                lblStatus.Text = string.Format("Pronto para atualizar da v{0} para a v1.4.0.", detectedExistingVersion);
+            }
         }
 
         private void InitializeComponent()
@@ -277,15 +367,27 @@ namespace OpenClevoRGBInstaller
             progressBar.Value = Math.Max(0, Math.Min(100, progress));
         }
 
-        private void PerformInstallation(string targetDir)
+        private void KillRunningProcesses()
         {
-            try
+            string[] procsToKill = new string[] { "OpenClevoRGB", "AvellRGBMaster" };
+            foreach (string procName in procsToKill)
             {
-                // Passo 1: Finalizar instâncias anteriores
-                SetStatus("Fechando processos em execução...", 10);
                 try
                 {
-                    ProcessStartInfo killPsi = new ProcessStartInfo("taskkill.exe", "/F /IM OpenClevoRGB.exe");
+                    Process[] procs = Process.GetProcessesByName(procName);
+                    if (procs != null && procs.Length > 0)
+                    {
+                        foreach (Process p in procs)
+                        {
+                            try { p.Kill(); } catch {}
+                        }
+                    }
+                }
+                catch {}
+
+                try
+                {
+                    ProcessStartInfo killPsi = new ProcessStartInfo("taskkill.exe", string.Format("/F /IM {0}.exe", procName));
                     killPsi.CreateNoWindow = true;
                     killPsi.UseShellExecute = false;
                     using (Process p = Process.Start(killPsi))
@@ -294,28 +396,35 @@ namespace OpenClevoRGBInstaller
                     }
                 }
                 catch {}
-                try
-                {
-                    ProcessStartInfo killOld = new ProcessStartInfo("taskkill.exe", "/F /IM AvellRGBMaster.exe");
-                    killOld.CreateNoWindow = true;
-                    killOld.UseShellExecute = false;
-                    using (Process p = Process.Start(killOld))
-                    {
-                        p.WaitForExit(3000);
-                    }
-                }
-                catch {}
-                Thread.Sleep(300);
+            }
+
+            // Aguarda o encerramento completo para o Windows liberar os arquivos do disco
+            for (int i = 0; i < 10; i++)
+            {
+                Process[] remaining = Process.GetProcessesByName("OpenClevoRGB");
+                if (remaining == null || remaining.Length == 0) break;
+                Thread.Sleep(200);
+            }
+            Thread.Sleep(300);
+        }
+
+        private void PerformInstallation(string targetDir)
+        {
+            try
+            {
+                // Passo 1: Finalizar instâncias anteriores para permitir a atualização
+                SetStatus(isUpdateMode ? "Encerrando versão em execução para atualizar..." : "Fechando processos em execução...", 10);
+                KillRunningProcesses();
 
                 // Passo 2: Criar diretório de destino
-                SetStatus("Criando diretório de instalação...", 25);
+                SetStatus(isUpdateMode ? "Preparando pasta do programa..." : "Criando diretório de instalação...", 25);
                 if (!Directory.Exists(targetDir))
                 {
                     Directory.CreateDirectory(targetDir);
                 }
 
                 // Passo 3: Copiar/Extrair arquivos (100% independente com recursos embutidos)
-                SetStatus("Instalando arquivos do programa...", 45);
+                SetStatus(isUpdateMode ? "Atualizando binários para a v1.4.0..." : "Instalando arquivos do programa...", 45);
                 string targetExe = Path.Combine(targetDir, "OpenClevoRGB.exe");
                 string targetDll = Path.Combine(targetDir, "clevomof.dll");
                 string targetUninstaller = Path.Combine(targetDir, "Desinstalador.exe");
@@ -327,12 +436,12 @@ namespace OpenClevoRGBInstaller
                 // Passo 4: Registrar Driver ACPI Clevo
                 if (chkRegisterDriver.Checked)
                 {
-                    SetStatus("Registrando metadados do driver ACPI...", 65);
+                    SetStatus("Verificando metadados do driver ACPI...", 65);
                     RegisterAcpiMetadata(targetDll);
                 }
 
-                // Passo 5: Criar Atalhos
-                SetStatus("Criando atalhos...", 80);
+                // Passo 5: Criar / Atualizar Atalhos
+                SetStatus(isUpdateMode ? "Atualizando atalhos do sistema..." : "Criando atalhos...", 80);
                 if (chkDesktopShortcut.Checked)
                 {
                     string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
@@ -355,22 +464,29 @@ namespace OpenClevoRGBInstaller
                 // Passo 6: Configurar Inicialização com o Windows (Task Scheduler com Admin)
                 if (chkAutoStart.Checked)
                 {
-                    SetStatus("Configurando inicialização automática com privilégios de Administrador...", 90);
+                    SetStatus(isUpdateMode ? "Atualizando inicialização automática no Windows..." : "Configurando inicialização automática...", 90);
                     ConfigureAutoStartTask(targetExe, true);
                 }
 
                 // Passo 7: Criar Desinstalador e Registro no Windows
-                SetStatus("Criando registros de desinstalação...", 95);
+                SetStatus(isUpdateMode ? "Atualizando registros de versão no Windows..." : "Criando registros de desinstalação...", 95);
                 CreateUninstallEntry(targetDir, targetExe);
 
-                SetStatus("Instalação concluída com sucesso!", 100);
+                SetStatus(isUpdateMode ? "Atualização concluída com sucesso!" : "Instalação concluída com sucesso!", 100);
                 Thread.Sleep(500);
 
                 this.Invoke(new Action(() => {
+                    string msgTitle = isUpdateMode ? "Atualização Concluída" : "Instalação Concluída";
+                    string msgText = isUpdateMode
+                        ? "O OpenClevoRGB foi atualizado com sucesso para a versão 1.4.0!\n\n" +
+                          "Todas as suas configurações salvas, atalhos de teclado e histórico de cores foram preservados.\n\n" +
+                          "Deseja abrir o aplicativo atualizado agora?"
+                        : "O OpenClevoRGB foi instalado com sucesso!\n\n" +
+                          "Deseja abrir o aplicativo agora?";
+
                     DialogResult res = MessageBox.Show(
-                        "O OpenClevoRGB foi instalado com sucesso!\n\n" +
-                        "Deseja abrir o aplicativo agora?",
-                        "Instalação Concluída",
+                        msgText,
+                        msgTitle,
                         MessageBoxButtons.YesNo,
                         MessageBoxIcon.Information
                     );
@@ -390,8 +506,8 @@ namespace OpenClevoRGBInstaller
             {
                 this.Invoke(new Action(() => {
                     MessageBox.Show(
-                        "Ocorreu um erro durante a instalação:\n\n" + ex.Message,
-                        "Erro na Instalação",
+                        "Ocorreu um erro durante o processo:\n\n" + ex.Message,
+                        "Erro na Operação",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error
                     );
@@ -399,44 +515,56 @@ namespace OpenClevoRGBInstaller
                     btnBrowse.Enabled = true;
                     txtInstallPath.Enabled = true;
                     btnCancel.Enabled = true;
-                    SetStatus("Instalação cancelada devido a erro.", 0);
+                    SetStatus("Operação cancelada devido a erro.", 0);
                 }));
             }
         }
 
         private void InstallFile(string fileName, string targetPath)
         {
-            // 1. Tenta extrair do recurso embutido (100% autossuficiente para binário único do GitHub)
-            if (ExtractEmbeddedFile(fileName, targetPath))
+            int maxRetries = 5;
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
-                return;
-            }
+                try
+                {
+                    // 1. Tenta extrair do recurso embutido (100% autossuficiente para binário único do GitHub)
+                    if (ExtractEmbeddedFile(fileName, targetPath))
+                    {
+                        return;
+                    }
 
-            // 2. Fallback: Procura na mesma pasta do executável
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            string localPath = Path.Combine(baseDir, fileName);
-            if (File.Exists(localPath))
-            {
-                File.Copy(localPath, targetPath, true);
-                return;
-            }
+                    // 2. Fallback: Procura na mesma pasta do executável
+                    string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                    string localPath = Path.Combine(baseDir, fileName);
+                    if (File.Exists(localPath))
+                    {
+                        File.Copy(localPath, targetPath, true);
+                        return;
+                    }
 
-            // 3. Fallback: Procura na estrutura de desenvolvimento (resources/ ou bin/)
-            string resPath = Path.Combine(baseDir, "..", "resources", fileName);
-            if (File.Exists(resPath))
-            {
-                File.Copy(resPath, targetPath, true);
-                return;
-            }
+                    // 3. Fallback: Procura na estrutura de desenvolvimento (resources/ ou bin/)
+                    string resPath = Path.Combine(baseDir, "..", "resources", fileName);
+                    if (File.Exists(resPath))
+                    {
+                        File.Copy(resPath, targetPath, true);
+                        return;
+                    }
 
-            string binPath = Path.Combine(baseDir, "..", "bin", fileName);
-            if (File.Exists(binPath))
-            {
-                File.Copy(binPath, targetPath, true);
-                return;
-            }
+                    string binPath = Path.Combine(baseDir, "..", "bin", fileName);
+                    if (File.Exists(binPath))
+                    {
+                        File.Copy(binPath, targetPath, true);
+                        return;
+                    }
 
-            throw new FileNotFoundException("Arquivo não encontrado embutido nem localmente: " + fileName);
+                    throw new FileNotFoundException("Arquivo não encontrado embutido nem localmente: " + fileName);
+                }
+                catch (IOException ioEx)
+                {
+                    if (attempt == maxRetries) throw ioEx;
+                    Thread.Sleep(400); // Aguarda o Windows liberar o lock do arquivo
+                }
+            }
         }
 
         private bool ExtractEmbeddedFile(string resourceName, string targetPath)
@@ -587,7 +715,7 @@ namespace OpenClevoRGBInstaller
                     {
                         key.SetValue("DisplayName", "OpenClevoRGB", RegistryValueKind.String);
                         key.SetValue("DisplayIcon", File.Exists(uninstallerExe) ? uninstallerExe : exePath, RegistryValueKind.String);
-                        key.SetValue("DisplayVersion", "1.3.0", RegistryValueKind.String);
+                        key.SetValue("DisplayVersion", "1.4.0", RegistryValueKind.String);
                         key.SetValue("Publisher", "OpenClevoRGB / Felipe Lima", RegistryValueKind.String);
                         key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
                         key.SetValue("UninstallString", uninstallerCmd, RegistryValueKind.String);

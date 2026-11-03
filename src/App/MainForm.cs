@@ -53,7 +53,15 @@ namespace OpenClevoRGB
         private Button btnTogglePower;
         private Button btnApply;
 
-        // Seção 5: Rodapé / Opções
+        // Seção 5: Atalhos de Teclado (Hotkeys)
+        private Panel cardHotkeys;
+        private CheckBox chkEnableHotkeys;
+        private Label lblHotkeysSummary;
+        private Label lblHotkeysSubtext;
+        private Button btnConfigureHotkeys;
+        private HotkeyManager hotkeyManager;
+
+        // Seção 6: Rodapé / Opções
         private Panel footerPanel;
         private CheckBox chkStartWithWindows;
         private CheckBox chkMinimizeToTray;
@@ -90,6 +98,14 @@ namespace OpenClevoRGB
             RefreshDriverStatus();
             ApplySavedSettings();
 
+            // Inicializa gerenciador de atalhos globais e eventos ACPI
+            hotkeyManager = new HotkeyManager();
+            hotkeyManager.OnCycleColor += CycleColor;
+            hotkeyManager.OnTogglePower += TogglePower;
+            hotkeyManager.OnBrightnessUp += BrightnessUp;
+            hotkeyManager.OnBrightnessDown += BrightnessDown;
+            hotkeyManager.Start(this.Handle, AppSettings.Current);
+
             // Escuta eventos de energia do Windows para restaurar cores após Suspensão (Sleep / Resume)
             Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged;
         }
@@ -97,7 +113,7 @@ namespace OpenClevoRGB
         private void InitializeComponent()
         {
             this.Text = "OpenClevoRGB";
-            this.Size = new Size(880, 780);
+            this.Size = new Size(880, 835);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
@@ -395,7 +411,70 @@ namespace OpenClevoRGB
             startY += 107;
 
             // ========================================================
-            // 6. SEÇÃO 5: RODAPÉ COM OPÇÕES
+            // 6. SEÇÃO 5: ATALHOS DE TECLADO (HOTKEYS)
+            // ========================================================
+            cardHotkeys = CreateCardPanel(25, startY, 815, 92);
+
+            Label lblSectionHotkeys = CreateSectionHeader("5. ATALHOS DE TECLADO (HOTKEYS)", 15, 12);
+            cardHotkeys.Controls.Add(lblSectionHotkeys);
+
+            chkEnableHotkeys = new CheckBox();
+            chkEnableHotkeys.Text = "Habilitar Atalhos Globais";
+            chkEnableHotkeys.Checked = AppSettings.Current.EnableHotkeys;
+            chkEnableHotkeys.ForeColor = ClrTextPrimary;
+            chkEnableHotkeys.Font = new Font("Segoe UI", 9f);
+            chkEnableHotkeys.Location = new Point(540, 12);
+            chkEnableHotkeys.AutoSize = true;
+            chkEnableHotkeys.Cursor = Cursors.Hand;
+            chkEnableHotkeys.CheckedChanged += (s, e) => {
+                AppSettings.Current.EnableHotkeys = chkEnableHotkeys.Checked;
+                AppSettings.Save();
+                if (hotkeyManager != null)
+                {
+                    hotkeyManager.RegisterAll(AppSettings.Current);
+                }
+                UpdateHotkeysSummary();
+            };
+            toolTip.SetToolTip(chkEnableHotkeys, "Ativa o controle do teclado RGB via teclas de atalho de dentro de qualquer jogo ou aplicativo.");
+            cardHotkeys.Controls.Add(chkEnableHotkeys);
+
+            lblHotkeysSummary = new Label();
+            lblHotkeysSummary.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            lblHotkeysSummary.Location = new Point(15, 38);
+            lblHotkeysSummary.Size = new Size(610, 22);
+            cardHotkeys.Controls.Add(lblHotkeysSummary);
+
+            lblHotkeysSubtext = new Label();
+            lblHotkeysSubtext.Text = "* Padrão: Teclas NumPad com Ctrl (ou Fn + NumPad do notebook via ACPI hardware).";
+            lblHotkeysSubtext.Font = new Font("Segoe UI", 8.5f);
+            lblHotkeysSubtext.ForeColor = ClrTextMuted;
+            lblHotkeysSubtext.Location = new Point(15, 62);
+            lblHotkeysSubtext.Size = new Size(610, 20);
+            cardHotkeys.Controls.Add(lblHotkeysSubtext);
+
+            btnConfigureHotkeys = new Button();
+            btnConfigureHotkeys.Text = "⌨️ Personalizar...";
+            btnConfigureHotkeys.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+            btnConfigureHotkeys.Location = new Point(640, 38);
+            btnConfigureHotkeys.Size = new Size(160, 36);
+            btnConfigureHotkeys.BackColor = Color.FromArgb(32, 38, 52);
+            btnConfigureHotkeys.ForeColor = ClrAccentCyan;
+            btnConfigureHotkeys.FlatStyle = FlatStyle.Flat;
+            btnConfigureHotkeys.FlatAppearance.BorderColor = ClrAccentCyan;
+            btnConfigureHotkeys.Cursor = Cursors.Hand;
+            ApplyHoverEffect(btnConfigureHotkeys, Color.FromArgb(32, 38, 52), Color.FromArgb(44, 52, 72));
+            btnConfigureHotkeys.Click += BtnConfigureHotkeys_Click;
+            toolTip.SetToolTip(btnConfigureHotkeys, "Abre a tela de personalização das combinações de teclas de atalho.");
+            cardHotkeys.Controls.Add(btnConfigureHotkeys);
+
+            this.Controls.Add(cardHotkeys);
+
+            UpdateHotkeysSummary();
+
+            startY += 104;
+
+            // ========================================================
+            // 7. SEÇÃO 6: RODAPÉ COM OPÇÕES
             // ========================================================
             footerPanel = CreateCardPanel(25, startY, 815, 54);
 
@@ -895,7 +974,7 @@ namespace OpenClevoRGB
             trayMenu.Items.Add(new ToolStripSeparator());
             trayMenu.Items.Add("Sobre o OpenClevoRGB...", null, (s, e) => {
                 MessageBox.Show(
-                    "OpenClevoRGB v1.3.0\n\n" +
+                    "OpenClevoRGB v1.4.0\n\n" +
                     "Desenvolvido por: Felipe Lima\n" +
                     "Engenharia e Pair Programming: Google Gemini 3.8 Flash\n" +
                     "Licença: MIT Open Source\n\n" +
@@ -942,6 +1021,161 @@ namespace OpenClevoRGB
             this.Activate();
         }
 
+        protected override void WndProc(ref Message m)
+        {
+            if (hotkeyManager != null && hotkeyManager.ProcessMessage(ref m))
+            {
+                return;
+            }
+            base.WndProc(ref m);
+        }
+
+        private static readonly Color[] CycleColors = new Color[]
+        {
+            Color.FromArgb(0, 229, 255),   // Ciano
+            Color.FromArgb(0, 140, 255),   // Azul
+            Color.FromArgb(0, 70, 255),    // Azul Escuro
+            Color.FromArgb(0, 230, 118),   // Verde Neon
+            Color.FromArgb(0, 200, 80),    // Esmeralda
+            Color.FromArgb(255, 214, 0),   // Amarelo
+            Color.FromArgb(255, 109, 0),   // Laranja
+            Color.FromArgb(255, 23, 68),    // Vermelho
+            Color.FromArgb(245, 0, 87),    // Rosa
+            Color.FromArgb(170, 0, 255),   // Roxo
+            Color.FromArgb(101, 31, 255),  // Violeta
+            Color.FromArgb(255, 255, 255)  // Branco
+        };
+
+        private static readonly string[] CycleColorNames = new string[]
+        {
+            "Ciano",
+            "Azul",
+            "Azul Escuro",
+            "Verde Neon",
+            "Esmeralda",
+            "Amarelo",
+            "Laranja",
+            "Vermelho",
+            "Rosa",
+            "Roxo",
+            "Violeta",
+            "Branco"
+        };
+
+        private int cycleColorIndex = 0;
+
+        public void CycleColor()
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(CycleColor));
+                return;
+            }
+
+            cycleColorIndex = (cycleColorIndex + 1) % CycleColors.Length;
+            Color nextColor = CycleColors[cycleColorIndex];
+            string name = CycleColorNames[cycleColorIndex];
+
+            chkSyncZones.Checked = true;
+            SetZoneColor(nextColor);
+
+            if (this.WindowState == FormWindowState.Minimized || !this.Visible)
+            {
+                trayIcon.ShowBalloonTip(1000, "OpenClevoRGB", "Cor do teclado alterada para: " + name, ToolTipIcon.Info);
+            }
+        }
+
+        public void TogglePower()
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(TogglePower));
+                return;
+            }
+
+            BtnTogglePower_Click(null, null);
+
+            if (this.WindowState == FormWindowState.Minimized || !this.Visible)
+            {
+                trayIcon.ShowBalloonTip(1000, "OpenClevoRGB", isLightOn ? "LEDs Ligados" : "LEDs Desligados", ToolTipIcon.Info);
+            }
+        }
+
+        public void BrightnessUp()
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(BrightnessUp));
+                return;
+            }
+
+            if (trackBrightness.Value < 4)
+            {
+                trackBrightness.Value++;
+                TrackBrightness_Scroll(null, null);
+            }
+
+            if (this.WindowState == FormWindowState.Minimized || !this.Visible)
+            {
+                trayIcon.ShowBalloonTip(1000, "OpenClevoRGB", "Brilho do Teclado: " + GetBrightnessString(trackBrightness.Value), ToolTipIcon.Info);
+            }
+        }
+
+        public void BrightnessDown()
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(BrightnessDown));
+                return;
+            }
+
+            if (trackBrightness.Value > 0)
+            {
+                trackBrightness.Value--;
+                TrackBrightness_Scroll(null, null);
+            }
+
+            if (this.WindowState == FormWindowState.Minimized || !this.Visible)
+            {
+                trayIcon.ShowBalloonTip(1000, "OpenClevoRGB", "Brilho do Teclado: " + GetBrightnessString(trackBrightness.Value), ToolTipIcon.Info);
+            }
+        }
+
+        private void UpdateHotkeysSummary()
+        {
+            if (AppSettings.Current.EnableHotkeys)
+            {
+                lblHotkeysSummary.Text = string.Format(
+                    "🎨 Cor: [{0}]   •   💡 Luz: [{1}]   •   🔆 Brilho +: [{2}]   •   🔅 Brilho -: [{3}]",
+                    AppSettings.Current.HotkeyCycleColor.ToDisplayString(),
+                    AppSettings.Current.HotkeyTogglePower.ToDisplayString(),
+                    AppSettings.Current.HotkeyBrightnessUp.ToDisplayString(),
+                    AppSettings.Current.HotkeyBrightnessDown.ToDisplayString()
+                );
+                lblHotkeysSummary.ForeColor = ClrTextPrimary;
+            }
+            else
+            {
+                lblHotkeysSummary.Text = "Atalhos globais de teclado desativados.";
+                lblHotkeysSummary.ForeColor = ClrTextMuted;
+            }
+        }
+
+        private void BtnConfigureHotkeys_Click(object sender, EventArgs e)
+        {
+            using (HotkeySettingsForm dlg = new HotkeySettingsForm())
+            {
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    UpdateHotkeysSummary();
+                    if (hotkeyManager != null)
+                    {
+                        hotkeyManager.RegisterAll(AppSettings.Current);
+                    }
+                }
+            }
+        }
+
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             if (AppSettings.Current.MinimizeToTray && e.CloseReason == CloseReason.UserClosing)
@@ -952,6 +1186,11 @@ namespace OpenClevoRGB
             }
             else
             {
+                if (hotkeyManager != null)
+                {
+                    hotkeyManager.Dispose();
+                    hotkeyManager = null;
+                }
                 Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged;
                 trayIcon.Visible = false;
             }

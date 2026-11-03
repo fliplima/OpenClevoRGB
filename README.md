@@ -16,6 +16,14 @@ Utilitário nativo, ultraleve e moderno para controle de cores, luminosidade e e
 - **Instalador 100% Independente:** Arquivo único `bin\Instalador_OpenClevoRGB.exe` (~73 KB) que possui todos os binários embutidos internamente. Pode ser baixado e executado isoladamente em qualquer pasta (ex: Downloads ou Desktop) sem depender de nenhum outro arquivo.
 - **Script Transparente Open Source:** Para quem prefere inspecionar o código antes de rodar, o script aberto `instalar.bat` realiza todo o processo de forma transparente em lote.
 - **Inicialização Automática Confiável:** Utiliza o **Agendador de Tarefas do Windows (`Task Scheduler`)** com privilégios elevados (`/rl highest`), contornando o bloqueio de UAC do Windows e iniciando silenciosamente junto com o sistema no boot.
+- **Atalhos de Teclado Globais & Teclas Físicas do Notebook:**
+  - Suporte às combinações padrão com ícones impressos no teclado numérico Clevo / Avell:
+    - **Trocar Cores (Ciclo):** `Fn + /` ou `Ctrl + Num /`
+    - **Ligar / Desligar Luz:** `Fn + *` ou `Ctrl + Num *`
+    - **Aumentar Brilho (+):** `Fn + +` ou `Ctrl + Num +`
+    - **Reduzir Brilho (-):** `Fn + -` ou `Ctrl + Num -`
+  - **Captura Híbrida Inteligente:** Escuta eventos de hardware ACPI em segundo plano (`CLEVO_EVENT` via WMI) e registra atalhos globais no Windows (`RegisterHotKey`) que funcionam mesmo enquanto você joga ou utiliza qualquer aplicativo em tela cheia com o utilitário minimizado na bandeja.
+  - **Totalmente Personalizável:** Tela dedicada para customizar cada atalho com qualquer modificador (`Ctrl`, `Alt`, `Shift`, `Win`) e tecla de sua preferência.
 - **Restauração Automática Pós-Suspensão (Sleep/Resume):** Monitora eventos de energia e restaura as cores salvas após o notebook acordar da suspensão.
 - **Controle de 3 Zonas RGB Independentes:**
   - **Zona Esquerda** *(QWE / ASD)*
@@ -83,6 +91,8 @@ OpenClevoRGB/
 │   │   ├── Program.cs               # Ponto de entrada e controle de instância única (Mutex)
 │   │   ├── MainForm.cs              # Interface gráfica Dark Theme, Tooltips e Sleep/Resume
 │   │   ├── AppSettings.cs           # Persistência de configurações e boot via Task Scheduler
+│   │   ├── HotkeyManager.cs         # Gerenciador de atalhos globais (Win32) e eventos ACPI
+│   │   ├── HotkeySettingsForm.cs    # Interface gráfica de personalização de atalhos
 │   │   └── ClevoController.cs       # Comunicação de baixo nível WMI/ACPI (SetKBLED)
 │   │
 │   ├── Installer/                   # Aplicativo Instalador

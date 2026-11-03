@@ -7,6 +7,27 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [1.4.0] - 2026-11-03
+
+### Adicionado
+- **Suporte Completo a Atalhos Globais e Teclas Fn do Notebook:**
+  - **Mapeamento das Teclas Físicas Clevo:** Mapeamento padrão dos ícones gravados nas teclas do teclado numérico:
+    - `Fn + / (NumPad)` / `Ctrl + Num /`: **Trocar Cor** (ciclo dinâmico entre as 12 cores elegantes da paleta).
+    - `Fn + * (NumPad)` / `Ctrl + Num *`: **Ligar / Desligar Luz** (toggle on/off com restauração do nível de brilho).
+    - `Fn + + (NumPad)` / `Ctrl + Num +`: **Aumentar Brilho** (incremento de nível 0% -> 25% -> 50% -> 75% -> 100%).
+    - `Fn + - (NumPad)` / `Ctrl + Num -`: **Reduzir Brilho** (decremento de nível 100% -> 75% -> 50% -> 25% -> 0%).
+  - **Captura Dual (Hardware ACPI + Windows Global Hotkeys):**
+    - `ClevoEventListener`: Escuta eventos de hardware ACPI em background (`CLEVO_EVENT` em `root\wmi`) emitidos pela BIOS/EC ao pressionar `Fn + NumPad`.
+    - `HotkeyManager`: Registra atalhos globais de sistema no Windows (`RegisterHotKey`) que funcionam mesmo enquanto você joga ou utiliza qualquer outro software, com o utilitário minimizado na bandeja.
+  - **Interface Completa de Personalização de Atalhos (`HotkeySettingsForm`):**
+    - Nova tela dedicada em Cyberpunk Dark Theme aberta pelo botão `⌨️ Personalizar...`.
+    - Permite configurar livremente os modificadores (`Ctrl`, `Alt`, `Shift`, `Win` ou nenhum) e qualquer tecla do teclado (NumPad, Teclas F1-F12, Setas, Navegação, Letras e Números).
+    - Botão *"Restaurar Padrões"* para voltar rapidamente às teclas padrão do teclado numérico.
+  - **Feedback Visual na Bandeja do Sistema:**
+    - Exibição de avisos sutis (Balloon Tips) ao alterar brilho, cor ou ligar/desligar luzes com o aplicativo em segundo plano.
+
+---
+
 ## [1.3.0] - 2026-10-22
 
 ### Adicionado

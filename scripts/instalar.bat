@@ -56,6 +56,7 @@ echo.
 echo [2/6] Fechando instancias antigas se houver...
 taskkill /F /IM OpenClevoRGB.exe >nul 2>&1
 taskkill /F /IM AvellRGBMaster.exe >nul 2>&1
+timeout /t 1 /nobreak >nul
 
 :: 5. Cria pasta e copia arquivos
 echo [3/6] Copiando arquivos do programa...
@@ -131,7 +132,7 @@ if exist "!UNINSTALL_EXE!" set "FINAL_UNINSTALLER=!UNINSTALL_EXE!"
 
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "DisplayName" /t REG_SZ /d "OpenClevoRGB" /f >nul
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "DisplayIcon" /t REG_SZ /d "!TARGET_EXE!" /f >nul
-reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "DisplayVersion" /t REG_SZ /d "1.3.0" /f >nul
+reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "DisplayVersion" /t REG_SZ /d "1.4.0" /f >nul
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "Publisher" /t REG_SZ /d "OpenClevoRGB / Felipe Lima" /f >nul
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "InstallLocation" /t REG_SZ /d "!INSTALL_DIR!" /f >nul
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "UninstallString" /t REG_SZ /d "\"!FINAL_UNINSTALLER!\"" /f >nul
