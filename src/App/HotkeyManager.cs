@@ -153,6 +153,8 @@ namespace OpenClevoRGB
 
         public void Start()
         {
+            if (watcher != null) return;
+
             try
             {
                 ManagementScope scope = new ManagementScope(@"\\.\root\wmi");

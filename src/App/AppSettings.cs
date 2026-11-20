@@ -87,6 +87,7 @@ namespace OpenClevoRGB
         public bool SyncZones { get; set; }
         public bool StartWithWindows { get; set; }
         public bool MinimizeToTray { get; set; }
+        public bool AutoCheckUpdates { get; set; }
 
         // Atalhos de Teclado
         public bool EnableHotkeys { get; set; }
@@ -105,6 +106,7 @@ namespace OpenClevoRGB
             SyncZones = true;
             StartWithWindows = false;
             MinimizeToTray = true;
+            AutoCheckUpdates = true;
 
             // Padrões dos Atalhos: Teclas NumPad padrão Clevo com Ctrl
             EnableHotkeys = true;
@@ -121,7 +123,7 @@ namespace OpenClevoRGB
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "OpenClevoRGB"
         );
-        private static readonly string FilePath = Path.Combine(FolderPath, "settings.xml");
+        internal static string FilePath = Path.Combine(FolderPath, "settings.xml");
 
         public static SettingsData Current = new SettingsData();
 
@@ -148,9 +150,10 @@ namespace OpenClevoRGB
         {
             try
             {
-                if (!Directory.Exists(FolderPath))
+                string dir = Path.GetDirectoryName(FilePath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 {
-                    Directory.CreateDirectory(FolderPath);
+                    Directory.CreateDirectory(dir);
                 }
 
                 XmlSerializer serializer = new XmlSerializer(typeof(SettingsData));

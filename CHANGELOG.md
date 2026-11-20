@@ -7,6 +7,27 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [1.5.0] - 2026-11-20
+
+### Adicionado
+- **Atualização Automática via GitHub Releases (`UpdateChecker.cs`):**
+  - Verificação automática e discreta em segundo plano 5 segundos após iniciar o aplicativo, consultando a API oficial de releases do GitHub com TLS 1.2.
+  - Opção **"Verificar atualizações automaticamente"** no rodapé do painel principal (salva em `settings.xml`), permitindo ao usuário habilitar ou desabilitar a busca automática a qualquer momento.
+  - Verificação manual disponível pelo botão **"🔄 Buscar Atualizações"** no rodapé e pelo menu da bandeja (**"Verificar atualizações..."**).
+  - Diálogo de confirmação exibindo a versão atual, a nova versão e as notas da release, perguntando ao usuário se deseja baixar e instalar a atualização agora.
+  - Download automático do `Instalador_OpenClevoRGB.exe` com janela de progresso em Dark Theme, validação de domínio HTTPS oficial do GitHub (`github.com` / `*.githubusercontent.com`) e execução automática do instalador *in-place*.
+- **Suíte de Testes Automatizados (`tests/OpenClevoRGB.Tests.cs` + `scripts/run_tests.bat`):**
+  - 18 testes unitários e de regressão compilados nativamente via `csc.exe` (sem dependências externas), cobrindo persistência XML, registro/desregistro real de hotkeys Win32, inicialização silenciosa (`-silent`), restauração de UI, fechamento para a bandeja, segurança do controlador WMI e lógica do `UpdateChecker`.
+
+### Corrigido
+- **Janela Preta ao Iniciar com o Windows (`-silent`):**
+  - Corrigido o bug no ciclo de vida WinForms onde a criação prematura do `HWND` no construtor do `MainForm` fazia a janela abrir visível e totalmente preta (sem controles renderizados) no logon do Windows.
+  - Implementado `SetVisibleCore` para manter o aplicativo 100% oculto na bandeja do sistema ao iniciar com `-silent`, restaurando a janela normalmente com todos os controles ao clicar no ícone da bandeja.
+- **Atalhos Globais (`Ctrl + NumPad`) Inativos Após Boot:**
+  - Movido o registro e desregistro de hotkeys Win32 para `OnHandleCreated` e `OnHandleDestroyed`, eliminando a perda dos atalhos que ocorria quando o handle da janela era recriado durante a inicialização silenciosa.
+
+---
+
 ## [1.4.0] - 2026-11-03
 
 ### Adicionado

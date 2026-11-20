@@ -125,7 +125,7 @@ namespace OpenClevoRGBInstaller
                 this.Text = "Atualizador - OpenClevoRGB";
                 lblTitle.Text = "ATUALIZAR • OPENCLEVO RGB";
                 lblTitle.ForeColor = ClrAccentGreen;
-                lblSubtitle.Text = string.Format("Instalação detectada (v{0} ➔ v1.4.0). Suas preferências e cores serão mantidas!", detectedExistingVersion);
+                lblSubtitle.Text = string.Format("Instalação detectada (v{0} ➔ v1.5.0). Suas preferências e cores serão mantidas!", detectedExistingVersion);
                 lblSubtitle.ForeColor = ClrAccentGreen;
 
                 if (!string.IsNullOrEmpty(detectedExistingPath))
@@ -135,7 +135,7 @@ namespace OpenClevoRGBInstaller
 
                 btnInstall.Text = "🔄 Atualizar Agora";
                 btnInstall.BackColor = Color.FromArgb(0, 180, 90);
-                lblStatus.Text = string.Format("Pronto para atualizar da v{0} para a v1.4.0.", detectedExistingVersion);
+                lblStatus.Text = string.Format("Pronto para atualizar da v{0} para a v1.5.0.", detectedExistingVersion);
             }
         }
 
@@ -424,7 +424,7 @@ namespace OpenClevoRGBInstaller
                 }
 
                 // Passo 3: Copiar/Extrair arquivos (100% independente com recursos embutidos)
-                SetStatus(isUpdateMode ? "Atualizando binários para a v1.4.0..." : "Instalando arquivos do programa...", 45);
+                SetStatus(isUpdateMode ? "Atualizando binários para a v1.5.0..." : "Instalando arquivos do programa...", 45);
                 string targetExe = Path.Combine(targetDir, "OpenClevoRGB.exe");
                 string targetDll = Path.Combine(targetDir, "clevomof.dll");
                 string targetUninstaller = Path.Combine(targetDir, "Desinstalador.exe");
@@ -478,7 +478,7 @@ namespace OpenClevoRGBInstaller
                 this.Invoke(new Action(() => {
                     string msgTitle = isUpdateMode ? "Atualização Concluída" : "Instalação Concluída";
                     string msgText = isUpdateMode
-                        ? "O OpenClevoRGB foi atualizado com sucesso para a versão 1.4.0!\n\n" +
+                        ? "O OpenClevoRGB foi atualizado com sucesso para a versão 1.5.0!\n\n" +
                           "Todas as suas configurações salvas, atalhos de teclado e histórico de cores foram preservados.\n\n" +
                           "Deseja abrir o aplicativo atualizado agora?"
                         : "O OpenClevoRGB foi instalado com sucesso!\n\n" +
@@ -715,7 +715,7 @@ namespace OpenClevoRGBInstaller
                     {
                         key.SetValue("DisplayName", "OpenClevoRGB", RegistryValueKind.String);
                         key.SetValue("DisplayIcon", File.Exists(uninstallerExe) ? uninstallerExe : exePath, RegistryValueKind.String);
-                        key.SetValue("DisplayVersion", "1.4.0", RegistryValueKind.String);
+                        key.SetValue("DisplayVersion", "1.5.0", RegistryValueKind.String);
                         key.SetValue("Publisher", "OpenClevoRGB / Felipe Lima", RegistryValueKind.String);
                         key.SetValue("InstallLocation", installDir, RegistryValueKind.String);
                         key.SetValue("UninstallString", uninstallerCmd, RegistryValueKind.String);

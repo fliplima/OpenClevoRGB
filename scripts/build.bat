@@ -36,6 +36,7 @@ echo Compilando bin\OpenClevoRGB.exe com icone e metadados...
     src\App\AppSettings.cs ^
     src\App\HotkeyManager.cs ^
     src\App\HotkeySettingsForm.cs ^
+    src\App\UpdateChecker.cs ^
     src\App\MainForm.cs ^
     src\App\Program.cs
 

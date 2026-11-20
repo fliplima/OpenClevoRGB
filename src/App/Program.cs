@@ -38,19 +38,8 @@ namespace OpenClevoRGB
                     }
                 }
 
-                MainForm mainForm = new MainForm();
-
-                if (startSilent)
-                {
-                    // Inicia sem mostrar a janela principal, mantendo apenas o NotifyIcon na bandeja
-                    mainForm.WindowState = FormWindowState.Minimized;
-                    mainForm.ShowInTaskbar = false;
-                    Application.Run(); // roda o message loop
-                }
-                else
-                {
-                    Application.Run(mainForm);
-                }
+                MainForm mainForm = new MainForm(startSilent);
+                Application.Run(mainForm);
             }
         }
     }

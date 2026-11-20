@@ -65,9 +65,15 @@ namespace OpenClevoRGB
         private Panel footerPanel;
         private CheckBox chkStartWithWindows;
         private CheckBox chkMinimizeToTray;
+        private CheckBox chkAutoCheckUpdates;
+        private Button btnCheckUpdates;
+        private Timer autoUpdateTimer;
+        private bool isCheckingUpdates = false;
+        internal static bool SuppressAutoUpdateCheckForTests = false;
 
         private KeyboardZone selectedZone = KeyboardZone.Left;
         private bool isLightOn = true;
+        private bool allowShowDisplay = true;
 
         // Paleta Dark Theme Premium
         private readonly Color ClrBgWindow     = Color.FromArgb(12, 13, 17);
@@ -78,8 +84,10 @@ namespace OpenClevoRGB
         private readonly Color ClrTextPrimary  = Color.FromArgb(240, 243, 250);
         private readonly Color ClrTextMuted    = Color.FromArgb(140, 148, 168);
 
-        public MainForm()
+        public MainForm(bool startSilent = false)
         {
+            this.allowShowDisplay = !startSilent;
+
             controller = new ClevoController();
             AppSettings.Load();
 
@@ -98,22 +106,69 @@ namespace OpenClevoRGB
             RefreshDriverStatus();
             ApplySavedSettings();
 
-            // Inicializa gerenciador de atalhos globais e eventos ACPI
+            // Inicializa gerenciador de atalhos globais e eventos ACPI.
+            // O registro no HWND é feito em OnHandleCreated para evitar
+            // criar o handle prematuramente antes de SetVisibleCore no modo silencioso.
             hotkeyManager = new HotkeyManager();
             hotkeyManager.OnCycleColor += CycleColor;
             hotkeyManager.OnTogglePower += TogglePower;
             hotkeyManager.OnBrightnessUp += BrightnessUp;
             hotkeyManager.OnBrightnessDown += BrightnessDown;
-            hotkeyManager.Start(this.Handle, AppSettings.Current);
 
             // Escuta eventos de energia do Windows para restaurar cores após Suspensão (Sleep / Resume)
             Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged;
         }
 
+        protected override void SetVisibleCore(bool value)
+        {
+            if (!allowShowDisplay)
+            {
+                value = false;
+                if (!this.IsHandleCreated)
+                {
+                    CreateHandle();
+                }
+            }
+            base.SetVisibleCore(value);
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            if (hotkeyManager != null)
+            {
+                hotkeyManager.Start(this.Handle, AppSettings.Current);
+            }
+
+            if (AppSettings.Current.AutoCheckUpdates && !SuppressAutoUpdateCheckForTests && autoUpdateTimer == null)
+            {
+                autoUpdateTimer = new Timer();
+                autoUpdateTimer.Interval = 5000; // Aguarda 5s após iniciar para não atrasar o logon
+                autoUpdateTimer.Tick += (s, args) =>
+                {
+                    autoUpdateTimer.Stop();
+                    if (AppSettings.Current.AutoCheckUpdates)
+                    {
+                        CheckForUpdatesAsync(false);
+                    }
+                };
+                autoUpdateTimer.Start();
+            }
+        }
+
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            if (hotkeyManager != null)
+            {
+                hotkeyManager.UnregisterAll();
+            }
+            base.OnHandleDestroyed(e);
+        }
+
         private void InitializeComponent()
         {
             this.Text = "OpenClevoRGB";
-            this.Size = new Size(880, 835);
+            this.Size = new Size(880, 860);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
@@ -476,12 +531,12 @@ namespace OpenClevoRGB
             // ========================================================
             // 7. SEÇÃO 6: RODAPÉ COM OPÇÕES
             // ========================================================
-            footerPanel = CreateCardPanel(25, startY, 815, 54);
+            footerPanel = CreateCardPanel(25, startY, 815, 78);
 
             chkStartWithWindows = new CheckBox();
             chkStartWithWindows.Text = "Iniciar com o Windows";
             chkStartWithWindows.Checked = AppSettings.Current.StartWithWindows;
-            chkStartWithWindows.Location = new Point(20, 16);
+            chkStartWithWindows.Location = new Point(20, 14);
             chkStartWithWindows.AutoSize = true;
             chkStartWithWindows.ForeColor = ClrTextPrimary;
             chkStartWithWindows.Cursor = Cursors.Hand;
@@ -495,7 +550,7 @@ namespace OpenClevoRGB
             chkMinimizeToTray = new CheckBox();
             chkMinimizeToTray.Text = "Minimizar para a bandeja ao fechar";
             chkMinimizeToTray.Checked = AppSettings.Current.MinimizeToTray;
-            chkMinimizeToTray.Location = new Point(340, 16);
+            chkMinimizeToTray.Location = new Point(250, 14);
             chkMinimizeToTray.AutoSize = true;
             chkMinimizeToTray.ForeColor = ClrTextPrimary;
             chkMinimizeToTray.Cursor = Cursors.Hand;
@@ -505,14 +560,43 @@ namespace OpenClevoRGB
             };
             toolTip.SetToolTip(chkMinimizeToTray, "Fecha para o relógio da barra de tarefas.");
 
+            chkAutoCheckUpdates = new CheckBox();
+            chkAutoCheckUpdates.Text = "Verificar atualizações automaticamente";
+            chkAutoCheckUpdates.Checked = AppSettings.Current.AutoCheckUpdates;
+            chkAutoCheckUpdates.Location = new Point(20, 46);
+            chkAutoCheckUpdates.AutoSize = true;
+            chkAutoCheckUpdates.ForeColor = ClrTextPrimary;
+            chkAutoCheckUpdates.Cursor = Cursors.Hand;
+            chkAutoCheckUpdates.CheckedChanged += (s, e) => {
+                AppSettings.Current.AutoCheckUpdates = chkAutoCheckUpdates.Checked;
+                AppSettings.Save();
+            };
+            toolTip.SetToolTip(chkAutoCheckUpdates, "Verifica automaticamente no GitHub se há uma nova versão disponível ao iniciar.");
+
+            btnCheckUpdates = new Button();
+            btnCheckUpdates.Text = "🔄 Buscar Atualizações";
+            btnCheckUpdates.Font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+            btnCheckUpdates.Location = new Point(625, 10);
+            btnCheckUpdates.Size = new Size(175, 28);
+            btnCheckUpdates.BackColor = Color.FromArgb(32, 38, 52);
+            btnCheckUpdates.ForeColor = ClrAccentCyan;
+            btnCheckUpdates.FlatStyle = FlatStyle.Flat;
+            btnCheckUpdates.FlatAppearance.BorderColor = ClrCardBorder;
+            btnCheckUpdates.Cursor = Cursors.Hand;
+            ApplyHoverEffect(btnCheckUpdates, Color.FromArgb(32, 38, 52), Color.FromArgb(44, 52, 72));
+            btnCheckUpdates.Click += (s, e) => CheckForUpdatesAsync(true);
+            toolTip.SetToolTip(btnCheckUpdates, "Verifica agora no GitHub se existe uma nova versão do OpenClevoRGB.");
+
             footerPanel.Controls.Add(chkStartWithWindows);
             footerPanel.Controls.Add(chkMinimizeToTray);
+            footerPanel.Controls.Add(chkAutoCheckUpdates);
+            footerPanel.Controls.Add(btnCheckUpdates);
 
             Label lblAiCredit = new Label();
             lblAiCredit.Text = "⚡ Powered by Gemini 3.8 Flash";
             lblAiCredit.Font = new Font("Segoe UI", 8f, FontStyle.Italic);
             lblAiCredit.ForeColor = Color.FromArgb(115, 125, 150);
-            lblAiCredit.Location = new Point(605, 18);
+            lblAiCredit.Location = new Point(605, 48);
             lblAiCredit.AutoSize = true;
             toolTip.SetToolTip(lblAiCredit, "Desenvolvido em Pair Programming com Google Gemini 3.8 Flash.");
             footerPanel.Controls.Add(lblAiCredit);
@@ -972,9 +1056,10 @@ namespace OpenClevoRGB
             trayMenu.Items.Add(menuColors);
 
             trayMenu.Items.Add(new ToolStripSeparator());
+            trayMenu.Items.Add("Verificar atualizações...", null, (s, e) => CheckForUpdatesAsync(true));
             trayMenu.Items.Add("Sobre o OpenClevoRGB...", null, (s, e) => {
                 MessageBox.Show(
-                    "OpenClevoRGB v1.4.0\n\n" +
+                    "OpenClevoRGB " + UpdateChecker.FormatVersion(UpdateChecker.GetCurrentVersion()) + "\n\n" +
                     "Desenvolvido por: Felipe Lima\n" +
                     "Engenharia e Pair Programming: Google Gemini 3.8 Flash\n" +
                     "Licença: MIT Open Source\n\n" +
@@ -1015,8 +1100,16 @@ namespace OpenClevoRGB
 
         public void ShowWindow()
         {
-            this.Show();
-            this.WindowState = FormWindowState.Normal;
+            allowShowDisplay = true;
+            this.ShowInTaskbar = true;
+            if (!this.Visible)
+            {
+                this.Show();
+            }
+            if (this.WindowState == FormWindowState.Minimized)
+            {
+                this.WindowState = FormWindowState.Normal;
+            }
             this.BringToFront();
             this.Activate();
         }
@@ -1192,7 +1285,207 @@ namespace OpenClevoRGB
                     hotkeyManager = null;
                 }
                 Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged;
-                trayIcon.Visible = false;
+                if (trayIcon != null)
+                {
+                    trayIcon.Visible = false;
+                }
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (autoUpdateTimer != null)
+                {
+                    autoUpdateTimer.Stop();
+                    autoUpdateTimer.Dispose();
+                    autoUpdateTimer = null;
+                }
+                Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+                if (hotkeyManager != null)
+                {
+                    hotkeyManager.Dispose();
+                    hotkeyManager = null;
+                }
+                if (trayIcon != null)
+                {
+                    trayIcon.Visible = false;
+                    trayIcon.Dispose();
+                    trayIcon = null;
+                }
+            }
+            base.Dispose(disposing);
+        }
+
+        public void CheckForUpdatesAsync(bool manual)
+        {
+            if (isCheckingUpdates) return;
+            isCheckingUpdates = true;
+
+            if (manual && btnCheckUpdates != null && !btnCheckUpdates.IsDisposed)
+            {
+                btnCheckUpdates.Enabled = false;
+                btnCheckUpdates.Text = "Verificando...";
+            }
+
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                UpdateCheckResult result = UpdateChecker.CheckForUpdate();
+
+                if (!this.IsDisposed && this.IsHandleCreated)
+                {
+                    try
+                    {
+                        this.BeginInvoke(new Action(() =>
+                        {
+                            isCheckingUpdates = false;
+                            if (btnCheckUpdates != null && !btnCheckUpdates.IsDisposed)
+                            {
+                                btnCheckUpdates.Enabled = true;
+                                btnCheckUpdates.Text = "🔄 Buscar Atualizações";
+                            }
+
+                            HandleUpdateCheckResult(result, manual);
+                        }));
+                    }
+                    catch
+                    {
+                        isCheckingUpdates = false;
+                    }
+                }
+                else
+                {
+                    isCheckingUpdates = false;
+                }
+            });
+        }
+
+        private void HandleUpdateCheckResult(UpdateCheckResult result, bool manual)
+        {
+            if (result == null || !result.Success)
+            {
+                if (manual)
+                {
+                    string err = (result != null && !string.IsNullOrEmpty(result.ErrorMessage))
+                        ? result.ErrorMessage
+                        : "Não foi possível verificar atualizações no momento.";
+                    MessageBox.Show(err, "Verificar Atualizações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                return;
+            }
+
+            if (!result.UpdateAvailable)
+            {
+                if (manual)
+                {
+                    MessageBox.Show(
+                        "Você já está utilizando a versão mais recente do OpenClevoRGB (" +
+                        UpdateChecker.FormatVersion(result.CurrentVersion) + ").",
+                        "OpenClevoRGB Atualizado",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+                }
+                return;
+            }
+
+            PromptAndInstallUpdate(result);
+        }
+
+        private void PromptAndInstallUpdate(UpdateCheckResult result)
+        {
+            ReleaseInfo release = result.LatestRelease;
+            string currentVerStr = UpdateChecker.FormatVersion(result.CurrentVersion);
+            string newVerStr = !string.IsNullOrWhiteSpace(release.TagName)
+                ? release.TagName
+                : UpdateChecker.FormatVersion(release.ParsedVersion);
+
+            string notes = release.ReleaseNotes ?? string.Empty;
+            if (notes.Length > 550)
+            {
+                notes = notes.Substring(0, 550).TrimEnd() + "...";
+            }
+
+            string message = string.Format(
+                "Uma nova versão do OpenClevoRGB está disponível!\n\n" +
+                "Versão atual: {0}\n" +
+                "Nova versão: {1}\n",
+                currentVerStr,
+                newVerStr
+            );
+
+            if (!string.IsNullOrWhiteSpace(notes))
+            {
+                message += "\nNovidades:\n" + notes + "\n";
+            }
+
+            message += "\nDeseja baixar e instalar a nova versão agora?";
+
+            DialogResult answer = MessageBox.Show(
+                message,
+                "Atualização Disponível • OpenClevoRGB",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Information
+            );
+
+            if (answer != DialogResult.Yes)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(release.InstallerDownloadUrl))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(release.HtmlUrl) { UseShellExecute = true });
+                }
+                catch { }
+                return;
+            }
+
+            using (UpdateDownloadDialog dlg = new UpdateDownloadDialog(release))
+            {
+                DialogResult dlResult = dlg.ShowDialog(this.Visible ? this : null);
+                if (dlResult == DialogResult.OK && !string.IsNullOrEmpty(dlg.DownloadedInstallerPath))
+                {
+                    try
+                    {
+                        if (UpdateChecker.LaunchInstaller(dlg.DownloadedInstallerPath))
+                        {
+                            if (trayIcon != null) trayIcon.Visible = false;
+                            Application.Exit();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            "O instalador foi baixado, mas não pôde ser iniciado automaticamente:\n" + ex.Message,
+                            "Erro ao Iniciar Instalador",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error
+                        );
+                    }
+                }
+                else
+                {
+                    DialogResult openBrowser = MessageBox.Show(
+                        "Não foi possível baixar o instalador automaticamente:\n" +
+                        (dlg.DownloadError ?? "Erro desconhecido.") +
+                        "\n\nDeseja abrir a página de download no navegador?",
+                        "Falha no Download",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning
+                    );
+                    if (openBrowser == DialogResult.Yes)
+                    {
+                        try
+                        {
+                            Process.Start(new ProcessStartInfo(release.HtmlUrl) { UseShellExecute = true });
+                        }
+                        catch { }
+                    }
+                }
             }
         }
 

@@ -132,7 +132,7 @@ if exist "!UNINSTALL_EXE!" set "FINAL_UNINSTALLER=!UNINSTALL_EXE!"
 
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "DisplayName" /t REG_SZ /d "OpenClevoRGB" /f >nul
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "DisplayIcon" /t REG_SZ /d "!TARGET_EXE!" /f >nul
-reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "DisplayVersion" /t REG_SZ /d "1.4.0" /f >nul
+reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "DisplayVersion" /t REG_SZ /d "1.5.0" /f >nul
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "Publisher" /t REG_SZ /d "OpenClevoRGB / Felipe Lima" /f >nul
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "InstallLocation" /t REG_SZ /d "!INSTALL_DIR!" /f >nul
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenClevoRGB" /v "UninstallString" /t REG_SZ /d "\"!FINAL_UNINSTALLER!\"" /f >nul

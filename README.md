@@ -25,6 +25,7 @@ Utilitário nativo, ultraleve e moderno para controle de cores, luminosidade e e
   - **Captura Híbrida Inteligente:** Escuta eventos de hardware ACPI em segundo plano (`CLEVO_EVENT` via WMI) e registra atalhos globais no Windows (`RegisterHotKey`) que funcionam mesmo enquanto você joga ou utiliza qualquer aplicativo em tela cheia com o utilitário minimizado na bandeja.
   - **Totalmente Personalizável:** Tela dedicada para customizar cada atalho com qualquer modificador (`Ctrl`, `Alt`, `Shift`, `Win`) e tecla de sua preferência.
 - **Restauração Automática Pós-Suspensão (Sleep/Resume):** Monitora eventos de energia e restaura as cores salvas após o notebook acordar da suspensão.
+- **Atualização Automática via GitHub Releases:** Verifica automaticamente novas versões no GitHub em segundo plano (com opção para desabilitar no rodapé), exibe as novidades e pergunta se você deseja baixar e executar o instalador automaticamente. Também conta com verificação manual pelo painel e pela bandeja.
 - **Controle de 3 Zonas RGB Independentes:**
   - **Zona Esquerda** *(QWE / ASD)*
   - **Zona Central** *(TYU / GHJ)*
@@ -93,6 +94,7 @@ OpenClevoRGB/
 │   │   ├── AppSettings.cs           # Persistência de configurações e boot via Task Scheduler
 │   │   ├── HotkeyManager.cs         # Gerenciador de atalhos globais (Win32) e eventos ACPI
 │   │   ├── HotkeySettingsForm.cs    # Interface gráfica de personalização de atalhos
+│   │   ├── UpdateChecker.cs         # Busca, download e execução de atualizações via GitHub Releases
 │   │   └── ClevoController.cs       # Comunicação de baixo nível WMI/ACPI (SetKBLED)
 │   │
 │   ├── Installer/                   # Aplicativo Instalador
@@ -105,10 +107,14 @@ OpenClevoRGB/
 │       ├── UninstallerProgram.cs    # Ponto de entrada do desinstalador
 │       └── UninstallerForm.cs       # Interface gráfica de desinstalação segura
 │
+├── tests/                           # Suíte de testes automatizados (sem dependências externas)
+│   └── OpenClevoRGB.Tests.cs        # Testes unitários e de regressão (UI, Hotkeys, Settings, Updates)
+│
 ├── scripts/                         # Scripts de compilação e automação
 │   ├── build_all.bat                # Compila o aplicativo, instalador e desinstalador
 │   ├── build.bat                    # Compila apenas o aplicativo principal
 │   ├── build_installer.bat          # Compila o instalador embutindo os binários
+│   ├── run_tests.bat                # Compila e executa todos os testes automatizados
 │   ├── instalar.bat                 # Script transparente de instalação aberta
 │   ├── desinstalar.bat              # Script de desinstalação
 │   └── registrar_driver_admin.bat   # Script para registrar os metadados ACPI no Windows
@@ -133,6 +139,12 @@ scripts\build_all.bat
 ```
 
 Os novos executáveis serão gerados automaticamente na pasta `bin\`.
+
+Para compilar e executar a suíte de testes automatizados:
+
+```bat
+scripts\run_tests.bat
+```
 
 ---
 
